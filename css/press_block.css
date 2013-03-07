@@ -1,0 +1,18 @@
+#block-press-block-pressblockcustom {
+	padding: 0 18px 0 18px;
+}
+#block-press-block-pressblockcustom img {
+	width: 100% !important;
+	height: auto;
+}
+.page-admin #edit-image-image-loc {
+	float: left;
+	width: 300px;
+	margin: 15px 15px 0 15px;
+}
+.page-admin .form-item-files-image {
+	float: left;
+}
+.page-admin  #edit-image-upload, .page-admin #edit-image-image-insert {
+	margin-top: 20px;
+}

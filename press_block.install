@@ -1,0 +1,30 @@
+<?php
+
+function press_block_schema() {
+	$schema['press_blocks'] = array(
+		'fields' => array(
+			'pb_id' => array(
+				'description' => 'holds id of press block item',
+				'type' => 'serial',
+				'unsigned' => TRUE,
+				'not null' => TRUE,
+			),
+			'page_path' => array(
+				'type' => 'text'
+			),
+			'title' => array(
+				'description' => 'the press block\'s title',
+				'type' => 'varchar',
+				'length' => 255,
+				'not null' => TRUE,
+				'default' => 'Untitled'
+			),
+			'body' => array(
+				'description' => 'the body of the press block',
+				'type' => 'text',
+			)
+		),
+		'primary key' => array('pb_id')
+	);
+	return $schema;
+}

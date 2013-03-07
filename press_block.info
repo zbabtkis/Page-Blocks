@@ -1,0 +1,8 @@
+name = "press_block"
+description = "Allows administrators to create custom content in a text block that can be assigned to any region on any page"
+core = "7.x"
+package = "CCBER"
+version = "7.x-1.0"
+
+scripts[] = "js/press_block.js"
+stylesheets[all][] = "css/press_block.css"

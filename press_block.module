@@ -1,0 +1,294 @@
+<?php
+  /**
+   * @file
+   * Allows administrators to create custom content in a text block that can be assigned to any region on any page
+   */
+
+function press_block_menu() {
+	$items = array();
+	$items['admin/structure/press_block'] = array(
+		'title'            => t('Press Blocks'),
+		'page callback'    => 'press_block_view_all',
+		'access arguments' => array('administer nodes'),
+		'type'             => MENU_NORMAL_ITEM);
+	$items['admin/structure/press_block/create'] = array(
+		'title'            => t('Create Press Block'),
+		'page callback'    => 'drupal_get_form',
+		'page arguments'   => array('press_block_create_block'),
+		'access arguments' => array('administer nodes'),
+		'type'             => MENU_NORMAL_ITEM);
+  $items['admin/structure/press_block/%/edit'] = array(
+    'title'            => t('Edit Press Block'),
+    'page callback'    => 'drupal_get_form',
+    'page arguments'   => array('press_block_edit_block', 3),
+    'access arguments' => array('administer nodes'),
+    'type'             => MENU_NORMAL_ITEM);
+  $items['admin/structure/press_block/%'] = array(
+    'title'            => t('View Press Block'),
+    'page callback'    => 'press_block_show_block',
+    'access arguments' => array('administer nodes'),
+    'type'             => MENU_NORMAL_ITEM);
+	$items['admin/structure/press_block/ajax'] = array(
+		'page callback'    => 'press_block_ajax',
+		'access arguments' => array('administer nodes'),
+		'type'             => MENU_CALLBACK);
+	return $items;
+}
+
+function press_block_create_block() {
+
+	$form = array();
+
+  if(isset($_POST['page'])) {
+    $page = $_POST['page'];
+  } else {
+    $page = '';
+  }
+
+  $form['page'] = array(
+    '#type' => 'textfield',
+    '#title' => t('Page Path'),
+    '#default_value' => $page,
+  );
+	$form['title'] = array(
+		'#type' => 'textfield',
+		'#title' => t('Block Title')
+	);
+	$form['body'] = array(
+		'#type' => 'text_format',
+		'#base_type' => 'textarea',
+		'#title' => t('Body'),
+		'#format' => 'full_html'
+	);
+	$form['image'] = array(
+		'#type' => 'fieldset',
+		'#tree' => TRUE
+  );
+	$form['#attributes'] = array(
+    'enctype' => 'multipart/form-data'
+  );
+  $form['image']['image-file'] = array(
+    '#type' => 'file',
+    '#title' => 'Choose Image'
+  );
+  $form['image']['image-loc'] = array(
+    '#type' => 'fieldset',
+    '#title' => 'Image Location'
+  );
+	$form['image']['upload'] = array(
+		'#type' => 'submit',
+		'#value' => t('Upload'),
+		'#submit' => array('press_block_ajax'),
+		'#ajax' => array(
+			'callback' => 'press_block_ajax',
+			'wrapper' => 'edit-image-image-loc',
+			'method'=>'replace',
+			'effect' => 'fade',
+			'progress' => array(
+				'type' => 'bar',
+				'message' => 'loading')
+			)
+	);
+  $form['image']['image-insert'] = array(
+    '#type' => 'button',
+    '#value' => t('Insert')
+  );
+  $form['submit'] = array(
+    '#type' => 'submit',
+    '#validate' => array('press_block_validate'),
+    '#submit' => array('press_block_save'),
+    '#value' => 'Save');
+	return($form);
+}
+
+function press_block_validate($form, $form_state) {
+  $page = $form_state['input']['page'];
+  $q = db_select('press_blocks', 'pb')->fields('pb')->condition('page_path', $page, '=')->execute()->fetchAssoc();
+  if($q) {
+    drupal_set_message('The page you are editing already exists. You have been redirected to the editing form for that page.', 'error');
+    drupal_goto('/admin/structure/press_block/' . $q['pb_id'] . '/edit');
+  }
+}
+
+function press_block_edit_block($form, $form_state, $pb_id) {
+  $form = array();
+
+  $results = db_select('press_blocks', 'pb')->fields('pb')->condition('pb_id', $pb_id,'=')->execute()->fetchAssoc();
+
+  if($results = db_select('press_blocks', 'pb')->fields('pb')->condition('pb_id', $pb_id,'=')->execute()->fetchAssoc()) {
+    
+    $form['page'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Page Path'),
+      '#default_value' => $results['page_path']
+    );
+    $form['title'] = array(
+      '#type' => 'textfield',
+      '#title' => t('Block Title'),
+      '#default_value' => $results['title']
+    );
+    $form['body'] = array(
+      '#type' => 'text_format',
+      '#base_type' => 'textarea',
+      '#title' => t('Body'),
+      '#format' => 'full_html',
+      '#default_value' => $results['body']
+    );
+    $form['image'] = array(
+      '#type' => 'fieldset',
+      '#tree' => TRUE
+    );
+    $form['#attributes'] = array(
+      'enctype' => 'multipart/form-data'
+    );
+    $form['image']['image-file'] = array(
+      '#type' => 'file',
+      '#title' => 'Choose Image'
+    );
+    $form['image']['image-loc'] = array(
+      '#type' => 'fieldset',
+      '#title' => 'Image Location'
+    );
+    $form['image']['image-insert'] = array(
+      '#type' => 'button',
+      '#value' => t('Insert')
+    );
+    $form['image']['upload'] = array(
+      '#type' => 'submit',
+      '#value' => t('Upload'),
+      '#submit' => array('press_block_ajax'),
+      '#ajax' => array(
+        'callback' => 'press_block_ajax',
+        'wrapper' => 'edit-image-image-loc',
+        'method'=>'replace',
+        'effect' => 'fade',
+        'progress' => array(
+          'type' => 'bar',
+          'message' => 'loading')
+        )
+      );
+    $form['update'] = array(
+      '#type' => 'submit',
+      '#value' => 'Update',
+      '#submit' => array('press_block_update'));
+    $form['delete'] = array(
+      '#type' => 'submit',
+      '#value' => 'Delete',
+      '#submit' => array('press_block_delete'));
+    return $form;
+  } else {
+    $form['error'] = array(
+      '#type' => 'fieldset',
+      '#title' => "Error: the block you requested is unavailable at this time or does not exist.");
+    return $form;
+  }
+}
+
+function press_block_update($form, $form_state) {
+  $pb_id = $form_state['build_info']['args'][0];
+  $up = db_update('press_blocks')->fields(array(
+    'page_path' => $form_state['input']['page'],
+    'title' => $form_state['input']['title'],
+    'body' => $form_state['input']['body']['value']))->condition('pb_id', $pb_id, '=')->execute();
+  if($up) {
+    drupal_set_message("The block has been updated");
+    drupal_goto('/' . $form_state['input']['page']);
+  }
+}
+
+function press_block_delete($form, $form_state) {
+  $pb_id = $form_state['build_info']['args'][0];
+
+  if( db_delete('press_blocks')->condition('pb_id', $pb_id)->execute()) {
+    drupal_set_message("Block successfully deleted.");
+    drupal_goto($form_state['input']['page']);
+  } else {
+    dsm("There was an error deleting the block. Please try again.");
+  }
+}
+
+function press_block_save($form, $form_state) {
+  $page = $form_state['input']['page'];
+	$title = $form_state['input']['title'];
+  $body = $form_state['input']['body']['value'];
+  $id = db_insert('press_blocks')
+    ->fields(array('title' => $title, 'body' => $body, 'page_path' => $page))
+    ->execute();
+  $form_state['redirect'] = 'admin/structure/press_block/' . $id;
+  drupal_goto($form_state['redirect']);
+}
+
+function press_block_view_all() {
+  $results = db_select('press_blocks', 'pb')->fields('pb')->execute();
+  $rows = array();
+  global $base_url;
+  foreach($results as $result) { $result_temp = array();
+    $result_temp['pb_id'] = l("Edit", $base_url . "/admin/structure/press_block/" . $result->pb_id . "/edit");
+    $result_temp['title'] = l($result->title,$base_url . "/admin/structure/press_block/" . $result->pb_id);
+    $result_temp['body'] = substr($result->body, 0,100) . "...";
+    $result_temp['page_path'] = $result->page_path;
+    $rows[] = $result_temp;
+  }
+  $th = array('pb_id' => 'id', 'title' => 'title', 'body' => 'body', 'page_path' => 'path');
+  $page = array('#theme'=> 'table','#header' => $th, '#rows' =>$rows);
+  return $page;
+}
+
+
+function press_block_show_block() {
+  $pb_id = arg(3);
+
+  $results = db_select('press_blocks', 'pb')->fields('pb')->condition('pb_id', $pb_id,'=')->execute()->fetchAssoc();
+  $page = theme('press_blocks', array('fields' => $results, 'pb_id' => $pb_id));
+  return $page;
+}
+
+function press_block_block_info() {
+  $blocks['pressblockcustom'] = array(
+    'info' => t('Custom Content Block'),
+    'cache' => DRUPAL_CACHE_GLOBAL);
+
+  $blocks['pressblockcustomadmin'] = array(
+    'info' => t('Custom Content Block Admin'),
+    'properties' => array('administrative'),
+    'cache' => DRUPAL_CACHE_GLOBAL);
+  return $blocks;
+}
+
+function press_block_block_view($delta = '') {
+  global $user;
+  $block = array();
+  $uri = $_GET['q'];
+  $results = db_select('press_blocks', 'pb')->fields('pb')->condition('page_path', $uri,'=')->execute()->fetchAssoc();
+  if($delta == 'pressblockcustom' && $results['title']) {
+    $body = $results['body'];
+    if(user_access('administer site configuration'))  { $body .= '<form style="text-align: center;" action="/admin/structure/press_block/' . $results['pb_id'] . '/edit" method="post"><button class="form-submit">Edit</button>'; }
+    $block['subject'] = $results['title'];
+    $block['content'] = t($body);
+  } elseif ($delta == 'pressblockcustomadmin' &&  !$results['title']) {
+    $block['subject'] = t('Custom Content');
+    $block['content'] = '<form style="text-align: center;" action="/admin/structure/press_block/create" method="post"><input type="hidden" name="page" value="' . $uri . '" /><button class="form-submit">Add Content</button>';
+  }
+  return $block;
+}
+
+function press_block_theme() { 
+  $theme = array();
+  $theme['press_blocks'] = array(
+    'template' => 'press_blocks',
+    'arguments' => array('fields' => NULL)
+  );
+
+  return $theme;
+}
+
+function press_block_ajax($form, $form_state) {
+	$file = file_save_upload('image', $validators = array(), $destination = 'public://press_block', $replace = FILE_EXISTS_RENAME);
+	if($file) {
+		$fid = $file->fid;
+		$doc_url = file_create_url($file->uri);
+		$file->status = FILE_STATUS_PERMANENT;
+		file_save($file);
+	}
+	return($doc_url);
+}
